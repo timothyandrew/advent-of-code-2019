@@ -12,9 +12,17 @@
                     accumulator
                     (recur (conj accumulator item))))))
 
-(defn day-9-1 [in]
-  (let [[channels a] (intcode/setup in)]
+(defn day-9-1 [program]
+  (let [[channels a] (intcode/setup program)]
     (a/>!! (:input channels) 1)
+    (intcode/exec a)
+    (await a)
+    (let [acc (drain-q (:output channels))]
+      (a/<!! acc))))
+
+(defn day-9-2 [program]
+  (let [[channels a] (intcode/setup program)]
+    (a/>!! (:input channels) 2)
     (intcode/exec a)
     (await a)
     (let [acc (drain-q (:output channels))]

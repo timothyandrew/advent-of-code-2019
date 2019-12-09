@@ -85,22 +85,23 @@
   ([tape pos channels]
    (intcode-async tape pos channels 0))
   ([tape pos channels rel-base]
-   (let [{:keys [opcode modes]} (parse-opcode (nth tape pos))]
-     (case opcode
-       99 (do
-            (a/close! (:output channels))
-            [tape pos channels])
-       (let [[{:keys [jump base]} new-tape] (case opcode
-                               1 (op + tape pos modes rel-base)
-                               2 (op * tape pos modes rel-base)
-                               3 (mov (read-input channels) tape pos modes rel-base)
-                               4 (send-output tape pos modes channels rel-base)
-                               5 (jmp-if-true tape pos modes rel-base)
-                               6 (jmp-if-false tape pos modes rel-base)
-                               7 (less-than tape pos modes rel-base)
-                               8 (equals tape pos modes rel-base)
-                               9 (adj-base tape pos modes rel-base))]
-         (intcode-async new-tape (+ pos jump) channels (or base rel-base)))))))
+   (loop [tape tape pos pos channels channels rel-base rel-base]
+     (let [{:keys [opcode modes]} (parse-opcode (nth tape pos))]
+       (case opcode
+         99 (do
+              (a/close! (:output channels))
+              [tape pos channels])
+         (let [[{:keys [jump base]} new-tape] (case opcode
+                                                1 (op + tape pos modes rel-base)
+                                                2 (op * tape pos modes rel-base)
+                                                3 (mov (read-input channels) tape pos modes rel-base)
+                                                4 (send-output tape pos modes channels rel-base)
+                                                5 (jmp-if-true tape pos modes rel-base)
+                                                6 (jmp-if-false tape pos modes rel-base)
+                                                7 (less-than tape pos modes rel-base)
+                                                8 (equals tape pos modes rel-base)
+                                                9 (adj-base tape pos modes rel-base))]
+           (recur new-tape (+ pos jump) channels (or base rel-base))))))))
 
 (defn setup
   ([program]
