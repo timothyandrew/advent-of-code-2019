@@ -20,14 +20,16 @@
    :CA {:count 1 :needs {:C 4 :A 1}}
    :FUEL {:count 1 :needs {:AB 2 :BC 3 :CA 4}}})
 
+(defn reverse-eqn [equation])
+
 (defn parse-input [file]
   (into {} (for [line (util/read-lines file)]
              (let [[l r] (s/split line #" => ")
                    needs (map #(s/split % #" ") (s/split l #", "))
                    [target-count target] (s/split r #" ")
-                   needs (map (fn [[n1 n2]] (vector (keyword n2) (Integer/parseInt n1) )) needs)]
+                   needs (map (fn [[n1 n2]] (vector (keyword n2) (Long/parseLong n1) )) needs)]
                [(keyword target)
-                { :count (Integer/parseInt target-count) :needs (into {} needs) }]))))
+                {:count (Long/parseLong target-count) :needs (into {} needs) }]))))
 
 (defn done? [needs]
   (and
@@ -39,13 +41,12 @@
 
 (defn replacement [equations all-needs [chemical n]]
   (let [{:keys [count needs]} (matching-eqn equations chemical)
-        factor (int (Math/ceil (/ n count)))
+        factor (long (Math/ceil (/ n count)))
         needs (into {} (map (fn [[k v]] [k (* v factor)]) needs))]
     (cond
       (= 0 (mod n count)) (merge-with + (dissoc all-needs chemical) needs)
       (> count n) (merge-with + (assoc all-needs chemical (- n count)) needs) 
       (< count n) (merge-with + (assoc all-needs chemical (- n (* count factor))) needs))))
-
 (defn pick-need [all-needs]
   (first (filter (fn [[k v]]
                    (and
@@ -53,9 +54,17 @@
                     (> v 0)))
                  all-needs)))
 
+(defn amplify-fuel [equations factor]
+  (update equations :FUEL (fn [{:keys [count needs]}]
+                            {:count (* count factor)
+                             :needs (into {} (map (fn [[k v]] [k (* v factor)]) needs))})))
+
 (defn day-14-1 [equations]
   (let [all-needs (get-in equations [:FUEL :needs])]
     (loop [i 0 needs all-needs]
       (if (done? needs)
         needs
         (recur (inc i) (replacement equations needs (pick-need needs)))))))
+
+(def mx (long (/ 1000000000000 233890)))
+(def mn (long (/ 1000000000000 857266)))
