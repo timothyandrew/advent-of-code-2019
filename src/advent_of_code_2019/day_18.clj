@@ -5,6 +5,7 @@
             [clojure.math.combinatorics :as c])
   (:import [java.util PriorityQueue HashMap]))
 
+(defonce example-0 (util/read-lines "input/18-0.txt"))
 (defonce example-1 (util/read-lines "input/18-1.txt"))
 (defonce example-2 (util/read-lines "input/18-2.txt"))
 (defonce example-3 (util/read-lines "input/18-3.txt"))
@@ -67,7 +68,7 @@
 (defn parse-path [[full-path filtered-path]]
   {:keys (filterv #(re-find #"[a-z]" (str %)) filtered-path)
    :doors (filterv #(re-find #"[A-Z]" (str %)) filtered-path)
-   :dist (count full-path)})
+   :dist (dec (count full-path))})
 
 (defn dijkstra [m axy bxy]
   (let [cost-so-far (atom {axy 0}) came-from (atom {})
@@ -81,7 +82,7 @@
           (parse-path (resolve-path m axy bxy @came-from))
           (do
             (doseq [next (keys neighbors)
-                    :let [cost (+ (get @cost-so-far current) 0)]
+                    :let [cost (+ (get @cost-so-far current) 1)]
                     :when (or (not (get @cost-so-far next))
                               (< cost (get @cost-so-far next)))]
               (swap! cost-so-far assoc next cost)
@@ -90,12 +91,13 @@
             (recur)))))))
 
 
-(defn accessible-keys [m state from]
-  (->> state
+(defn accessible-keys [m doors keys-so-far from]
+  (->> doors
        (filter (fn [[k v]] (and
                             (not= (second k) \@)
+                            (not (contains? keys-so-far (second k)))
                             (= (first k) (get-in m from)))))
-       (filter (fn [[k v]] (empty? (:doors v))))
+       (filter (fn [[k v]] (empty? (set/difference v keys-so-far))))
        (map (comp second first))))
 
 (defn dfs
@@ -115,34 +117,26 @@
 (defn precompute [m]
   (let [start (map-find m \@)
         ks (cons \@ (filter #(re-find #"[a-z]" (str %)) (str/join m)))
-        pairs (remove #(apply = %) (map vec (c/selections ks 2)))]
-    {:keycount (count ks)
+        pairs (remove #(apply = %) (map vec (c/selections ks 2)))
+        state (zipmap
+               pairs
+               (map #(dijkstra
+                      m
+                      (map-find m (first %))
+                      (map-find m (second %))) pairs))]
+    {:keyref (into {} (map vec (partition 2 (interleave ks (range))))) 
      :map-lookup (zipmap ks (map #(map-find m %) ks))
-     :state
-     (zipmap
-      pairs
-      (map #(dijkstra
-             m
-             (map-find m (first %))
-             (map-find m (second %))) pairs))}))
+     :doors (util/map-vals (fn [x]
+                             (set (map #(first (str/lower-case %)) (:doors x)))) state)
+     :dist (util/map-vals :dist state)}))
 
-(defn update-state [state keys-collected]
-  (util/map-vals
-   (fn [v]
-     (-> v
-         (update :keys (fn [k] (remove #(contains? keys-collected %) k)))
-         (update :doors (fn [k] (remove #(contains? keys-collected (first (str/lower-case %))) k)))))
-   state))
-
-(defn calc-answer [m {:keys [state]} path]
+(defn calc-answer [m {:keys [dist]} path]
   (->> path
        (partition 2 1)
-       (map #(get-in state [% :dist]))
-       (map dec)
+       (map #(get dist %))
        (reduce +)))
 
-(defn dijkstra-2 [m {:keys [keycount map-lookup state]}]
-  (println map-lookup keycount)
+(defn dijkstra-2 [m {:keys [keyref map-lookup doors dist] :as state}]
   (let [start [(map-find m \@) #{}]
         cost-so-far (atom {start 0}) came-from (atom {})
         c-fn (comparator (fn [pxy qxy]  (< (get @cost-so-far pxy) (get @cost-so-far qxy))))
@@ -151,14 +145,14 @@
     (loop [i 0]
       (let [current (.poll frontier)
             keys-so-far (second current)
-            state (update-state state (set (map #(get-in m %) keys-so-far)))
+            accessible (accessible-keys m doors (set (map #(get-in m %) keys-so-far)) (first current))
             neighbors (map #(vector % (conj keys-so-far %))
-                           (map #(get map-lookup %) (accessible-keys m state (first current))))]
+                           (map #(get map-lookup %) accessible))]
         (when (= (mod i 1000) 0)
           (println i (count keys-so-far)))
 
         (cond
-          (= (dec keycount) (count keys-so-far))  
+          (= (dec (count keyref)) (count keys-so-far))  
           (vec (reverse (map #(get-in m %) (map first (first (resolve-path m start current @came-from))))))
 
           (nil? current)
@@ -168,8 +162,7 @@
           (do
             (doseq [next neighbors 
                     :let [cost (+ (get @cost-so-far current)
-                                  (get-in state [[(get-in m (first current)) (get-in m (first next))] :dist])
-                                  (- (count (get-in state [[(get-in m (first current)) (get-in m (first next))] :keys]))))]
+                                  (get dist [(get-in m (first current)) (get-in m (first next))]))]
                     :when (or (not (get @cost-so-far next))
                               (< cost (get @cost-so-far next)))]
               (swap! cost-so-far assoc next cost)
@@ -180,8 +173,10 @@
 (defn day-18-1 [m]
   (loop []
     (let [state (precompute m)
+          _ (def dist (:dist state)) 
           _ (println "PRECOMPUTED")
           path (dijkstra-2 m state)]
       (if (= path :FAILED)
         :FAILED
-        (calc-answer m state path)))))
+        [(calc-answer m state path)
+         path]))))
