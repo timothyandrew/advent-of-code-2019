@@ -38,28 +38,6 @@
          [[i (dec j)] (get-in m [i (dec j)])]
          [[i (inc j)] (get-in m [i (inc j)])]]))
 
-(defn resolve-path [m a b came-from]
-  (when (get came-from b)
-    (let [pathxy
-          (loop [current b path [b]]
-            (let [next (get came-from current)]
-              (if (= next a)
-                (conj path a)
-                (recur next (conj path next)))))]
-      [pathxy
-       (->> pathxy
-            (mapv #(get-in m %))
-            (remove #(= % \.))
-            reverse
-            (drop 1)
-            drop-last
-            vec)])))
-
-(defn parse-path [[full-path filtered-path]]
-  {:keys (filterv #(re-find #"[a-z]" (str %)) filtered-path)
-   :doors (filterv #(re-find #"[A-Z]" (str %)) filtered-path)
-   :dist (dec (count full-path))})
-
 (defn accessible-keys [m doors keys-so-far from]
   (->> doors
        (filter (fn [[k v]] (and
@@ -75,39 +53,14 @@
        (map #(get dist %))
        (reduce +)))
 
-(defn dijkstra [m {:keys [start neighbors-fn done? parse-final cost log]}]
-  (let [cost-so-far (atom {start 0}) came-from (atom {})
-        c-fn (comparator (fn [pxy qxy]  (< (get @cost-so-far pxy) (get @cost-so-far qxy))))
-        frontier (PriorityQueue. c-fn)]
-    (.add frontier start)
-    (loop [i 0]
-      (let [current (.poll frontier)
-            neighbors (neighbors-fn current)]
 
-        (when (= (mod i 1000) 0)
-          (log i current))
-
-        (cond
-          (done? current) 
-          (parse-final (resolve-path m start current @came-from))
-
-          (nil? current)
-          :FAILED
-          
-          :else
-          (do
-            (doseq [next neighbors 
-                    :let [cost (+ (get @cost-so-far current)
-                                  (cost current next))]
-                    :when (or (not (get @cost-so-far next))
-                              (< cost (get @cost-so-far next)))]
-              (swap! cost-so-far assoc next cost)
-              (swap! came-from assoc next current)
-              (.add frontier next))
-            (recur (inc i))))))))
+(defn parse-path [[full-path filtered-path]]
+  {:keys (filterv #(re-find #"[a-z]" (str %)) filtered-path)
+   :doors (filterv #(re-find #"[A-Z]" (str %)) filtered-path)
+   :dist (dec (count full-path))})
 
 (defn dijk-precompute [m from to]
-  (dijkstra
+  (util/dijkstra
    m
    {:start from 
     :neighbors-fn (fn [current] (keys (util/filter-vals #(not= % \#) (surroundings m current))))
@@ -117,7 +70,7 @@
     :log (constantly nil)}))
 
 (defn dijk-part2 [m from to]
-  (dijkstra
+  (util/dijkstra
    m
    {:start from 
     :neighbors-fn (fn [current] (keys (util/filter-vals #(not= % \#) (surroundings m current))))
@@ -127,7 +80,7 @@
     :log (constantly nil)}))
 
 (defn dijk-traversal [m {:keys [doors dist keyref map-lookup] :as state}]
-  (dijkstra
+  (util/dijkstra
    m
    {:start [(map-find m \@) #{}]
 
@@ -194,7 +147,7 @@
   (loop []
     (let [state (precompute m)
           _ (println "PRECOMPUTED")
-          path (dijkstra-2 m state)]
+          path (dijk-traversal m state)]
       (if (= path :FAILED)
         :FAILED
         [(calc-answer m state path)

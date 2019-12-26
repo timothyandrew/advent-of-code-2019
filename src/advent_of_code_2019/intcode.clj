@@ -105,10 +105,10 @@
 
 (defn setup
   ([program]
-   (let [channels {:input (a/chan 10000) :output (a/chan 100000)}]
+   (let [channels {:input (a/chan 1000) :output (a/chan 1000)}]
      (setup program channels)))
   ([program channels]
-   (let [padded-program (into [] (concat program (take 1000000 (repeat 0))))]
+   (let [padded-program (into [] (concat program (take 1000 (repeat 0))))]
      [channels (agent [padded-program 0 channels])])))
 
 (defn exec [a]
