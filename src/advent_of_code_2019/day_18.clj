@@ -10,6 +10,7 @@
 (defonce example-2 (util/read-lines "input/18-2.txt"))
 (defonce example-3 (util/read-lines "input/18-3.txt"))
 (def input (util/read-lines "input/18.txt"))
+(def input2 (util/read-lines "input/18part2.txt"))
 
 (defn cell [map [i j]]
   (get-in map [i j]))
@@ -21,8 +22,11 @@
         :when (f [i j])]
     [i j]))
 
+(defn map-find-all [map a]
+  (traverse map #(= a (get-in map %))))
+
 (defn map-find [map a]
-  (first (traverse map #(= a (get-in map %)))))
+  (first (map-find-all map a)))
 
 (defn pp [m]
   (doall (map println m)))
@@ -112,6 +116,16 @@
     :cost (constantly 1)
     :log (constantly nil)}))
 
+(defn dijk-part2 [m from to]
+  (dijkstra
+   m
+   {:start from 
+    :neighbors-fn (fn [current] (keys (util/filter-vals #(not= % \#) (surroundings m current))))
+    :done? #(= to %)
+    :parse-final identity
+    :cost (constantly 1)
+    :log (constantly nil)}))
+
 (defn dijk-traversal [m {:keys [doors dist keyref map-lookup] :as state}]
   (dijkstra
    m
@@ -152,10 +166,33 @@
      :doors (util/map-vals (fn [x] (set (map #(first (str/lower-case %)) (:doors x)))) state)
      :dist (util/map-vals :dist state)}))
 
+(defn which-vault? [m [i j]]
+  (cond
+    (and (< i 40) (< j 40)) 0
+    (and (< i 40) (> j 40)) 1
+    (and (> i 40) (> j 40)) 2
+    (and (> i 40) (< j 40)) 3))
+
+(defn calc-part2-answer [path]
+  (let [m input2
+        state (precompute input)
+        robots (mapv #(map-find m (first (str %))) [1 2 3 4])
+        path (drop 1 (mapv #(get (:map-lookup state) %) path))]
+    (loop [dist 0 path path robots robots]
+      (if (empty? path)
+        dist
+        (let [current (first path)
+              vault (which-vault? m current)
+              robot (nth robots vault)
+              move-to (dijk-part2 m robot current)
+              new-dist (count (first move-to))]
+          (recur (+ dist (dec new-dist))
+                 (next path)
+                 (assoc robots vault current)))))))
+
 (defn day-18-1 [m]
   (loop []
     (let [state (precompute m)
-          _ (def dist (:dist state)) 
           _ (println "PRECOMPUTED")
           path (dijkstra-2 m state)]
       (if (= path :FAILED)
