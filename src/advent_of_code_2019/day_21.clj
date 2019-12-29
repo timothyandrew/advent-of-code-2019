@@ -22,15 +22,22 @@
 
 (def instructions
   [
-   ;; No ground immediately
+   ;; nothing at 1
    "NOT A J"
 
-   ;; Ground 3 steps away and not 2 steps away
+
+   ;; nothing at 3, something at 4, something at 9
    "NOT C T"
+   "AND D T"
+   "AND H T"
+   "OR T J"
+
+   ;; nothing at 2, something at 4
+   "NOT B T"
    "AND D T"
    "OR T J"
 
-   "WALK"
+   "RUN"
    ])
 
 (defn day-21-1 []
