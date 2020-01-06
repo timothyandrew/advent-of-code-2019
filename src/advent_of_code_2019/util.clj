@@ -8,6 +8,9 @@
   (s/split-lines
    (slurp (io/resource filename))))
 
+(defn chan-count [c]
+  (.count (.buf c)))
+
 (defn map-vals [f m]
   (into {} (map (fn [[k v]] [k (f v)]) m)))
 

@@ -25,9 +25,12 @@
   (let [dest-position (dest-pos tape (inc pos) rel-base mode)]
     [{:jump 2} (assoc tape dest-position in)]))
 
-(defn read-input [{:keys [input]}]
-  (let [input (a/<!! input)]
-    input))
+(defn read-input [{:keys [input]} opts]
+  (if (:nonblocking-input opts)
+    (let [[val _] (a/alts!! [(a/timeout 10) input])]
+      (or val -1))
+    (let [val (a/<!! input)]
+      val)))
 
 (defn send-output [tape pos [mode] {:keys [output]} rel-base]
   (let [out (read-tape tape (inc pos) mode rel-base)]
@@ -82,9 +85,9 @@
                    (map mode-sym))})))
 
 (defn intcode-async
-  ([tape pos channels]
-   (intcode-async tape pos channels 0))
-  ([tape pos channels rel-base]
+  ([tape pos channels opts]
+   (intcode-async tape pos channels 0 opts))
+  ([tape pos channels rel-base opts]
    (loop [tape tape pos pos channels channels rel-base rel-base]
      (let [{:keys [opcode modes]} (parse-opcode (nth tape pos))]
        (case opcode
@@ -94,7 +97,7 @@
          (let [[{:keys [jump base]} new-tape] (case opcode
                                                 1 (op + tape pos modes rel-base)
                                                 2 (op * tape pos modes rel-base)
-                                                3 (mov (read-input channels) tape pos modes rel-base)
+                                                3 (mov (read-input channels opts) tape pos modes rel-base)
                                                 4 (send-output tape pos modes channels rel-base)
                                                 5 (jmp-if-true tape pos modes rel-base)
                                                 6 (jmp-if-false tape pos modes rel-base)
@@ -105,11 +108,13 @@
 
 (defn setup
   ([program]
+   (setup program {}))
+  ([program opts]
    (let [channels {:input (a/chan 1000) :output (a/chan 1000)}]
-     (setup program channels)))
-  ([program channels]
+     (setup program channels opts)))
+  ([program channels opts]
    (let [padded-program (into [] (concat program (take 1000 (repeat 0))))]
-     [channels (agent [padded-program 0 channels])])))
+     [channels (agent [padded-program 0 channels opts])])))
 
 (defn exec [a]
   (send-off a #(apply intcode-async %)))
