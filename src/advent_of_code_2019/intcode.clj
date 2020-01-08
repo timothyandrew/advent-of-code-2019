@@ -110,7 +110,7 @@
   ([program]
    (setup program {}))
   ([program opts]
-   (let [channels {:input (a/chan 1000) :output (a/chan 1000)}]
+   (let [channels {:input (a/chan 10000) :output (a/chan 100000)}]
      (setup program channels opts)))
   ([program channels opts]
    (let [padded-program (into [] (concat program (take 1000 (repeat 0))))]
